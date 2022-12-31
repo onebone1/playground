@@ -6,27 +6,32 @@
 #include <time.h>
 
 #define THREAD_NUM 4
-#define TASK_NUM 100
+#define TASK_NUM 10
+#define DATA_NUM 10
 
-typedef struct {
-  int a, b;
-} Task;
-
-Task taskQueue[256];
 int taskCount = 0;
 int finished = 0;
+int taskQueue[TASK_NUM];
+int data[DATA_NUM];
 
 pthread_mutex_t mutexQueue;
 pthread_cond_t condQueue;
 
-void executeTask(Task *task) {
-  int result = task->a + task->b;
-  printf("The sum of %d and %d is %d\n", task->a, task->b, result);
+void executeTask(int index) {
+  usleep(5000);
+  pthread_mutex_lock(&mutexQueue);
+  if (index == 0 || index == 1) {
+    data[index] = 1;
+  } else {
+    data[index] = data[index - 1] + data[index - 2];
+  }
+  printf("Fib(%d): %d\n", index, data[index]);
+  pthread_mutex_unlock(&mutexQueue);
 }
 
-void submitTask(Task task) {
+void submitTask(int i) {
   pthread_mutex_lock(&mutexQueue);
-  taskQueue[taskCount] = task;
+  taskQueue[taskCount] = i;
   taskCount++;
   pthread_mutex_unlock(&mutexQueue);
   pthread_cond_signal(&condQueue);
@@ -34,21 +39,19 @@ void submitTask(Task task) {
 
 void* startThread(void* args) {
   while (1) {
-    Task task;
-
     if (taskCount == 0 && finished) break;
     pthread_mutex_lock(&mutexQueue);
     while (taskCount == 0) {
       pthread_cond_wait(&condQueue, &mutexQueue);
     }
-    task = taskQueue[0];
+    int index = taskQueue[0];
     int i;
     for (i = 0; i < taskCount - 1; i++) {
       taskQueue[i] = taskQueue[i + 1];
     }
     taskCount--;
     pthread_mutex_unlock(&mutexQueue);
-    executeTask(&task);
+    executeTask(index);
   }
   pthread_exit(NULL);
 }
@@ -66,11 +69,7 @@ int main() {
 
   srand(time(NULL));
   for (i = 0; i < TASK_NUM; i++) {
-    Task t = {
-      .a = rand() % 100,
-      .b = rand() %100
-    };
-    submitTask(t);
+    submitTask(i);
     if (i == TASK_NUM - 1) {
       pthread_mutex_lock(&mutexQueue);
       finished = 1;
