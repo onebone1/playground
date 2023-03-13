@@ -2,7 +2,7 @@
 
 ## Setup
 ```bash
-go mod init anyName
+go mod init <Your root directory name of this project>
 go mod tidy
 ```
 
